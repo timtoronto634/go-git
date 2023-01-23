@@ -37,7 +37,13 @@ to quickly create a Cobra application.`,
 			".go-git/refs/tags",
 		}
 		for _, d := range directories {
-			os.Mkdir(d, os.ModePerm)
+			err := os.Mkdir(d, os.ModePerm)
+			if os.IsExist(err) {
+				log.Fatal("go-git directory already exists.")
+			}
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 		for _, fname := range files {
 			f, err := os.Create(fname)

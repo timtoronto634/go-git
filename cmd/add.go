@@ -16,6 +16,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const MAX_FILE_BYTES = 2000000
+
 const (
 	GO_GIT_DIR  = ".go-git/"
 	OBJECTS_DIR = "objects/"
@@ -37,18 +39,18 @@ var addCmd = &cobra.Command{
 		}
 		filename := args[0]
 
-		file, err := os.Open(filename)
+		// calc sha1 hash
+		file_for_hash, err := os.Open(filename)
 		if os.IsNotExist(err) {
 			log.Fatalf("could not find the file `%v`; is the path correct? error: %v", filename, err)
 		}
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer file.Close()
+		defer file_for_hash.Close()
 
-		// calc sha1 hash
 		sha := sha1.New()
-		if _, err := io.Copy(sha, file); err != nil {
+		if _, err := io.Copy(sha, file_for_hash); err != nil {
 			log.Fatal(err)
 		}
 		var bs []byte = sha.Sum(nil)
@@ -56,34 +58,31 @@ var addCmd = &cobra.Command{
 		object_dir := OBJECTS_DIR + hexhash[:2] + "/"
 		object_name := hexhash[2:]
 
-		file2, err := os.Open(filename)
+		// compress contents
+		file_for_compress, err := os.Open(filename)
 		if err != nil {
 			fmt.Println("error on opening file")
 			log.Fatal(err)
 		}
-		data := make([]byte, 2000000)
-		count, err := file2.Read(data)
+		data := make([]byte, MAX_FILE_BYTES)
+		count, err := file_for_compress.Read(data)
 		if err != nil {
-			fmt.Println("error on reading contents of file")
-			log.Fatal(err)
+			log.Fatalf("error on reading contents of file. error: %v", err)
+		}
+		if count == MAX_FILE_BYTES {
+			log.Fatalf("specified file is too big: %v", filename)
 		}
 		data = data[:count]
-		fmt.Printf("read %v bytes\ngot data len: %v\n", count, len(data))
 
-		deflated := new(bytes.Buffer)
-		zw := zlib.NewWriter(deflated)
-		defer zw.Close()
-
-		n, err := zw.Write(data)
+		var deflated bytes.Buffer
+		zw := zlib.NewWriter(&deflated)
+		_, err = zw.Write(data)
 		if err != nil {
 			log.Fatal(err)
 		}
-		// fmt.Println(deflated)
-		fmt.Println(n)
-		bb := deflated.Bytes()
-		fmt.Printf("%d bytes: %v\n", len(bb), bb)
-		fmt.Println(deflated.String())
+		zw.Close()
 
+		// cd
 		err = os.Chdir(GO_GIT_DIR)
 		if os.IsNotExist(err) {
 			log.Fatalf("could not find the .go-git directory; call `go-git init`. error: %v", err)
@@ -92,10 +91,10 @@ var addCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
+		// write object(compressed)
 		if err := os.Mkdir(object_dir, os.ModePerm); err != nil && (!os.IsExist(err)) {
 			log.Fatal(err)
 		}
-
 		blob, err := os.Create(object_dir + object_name)
 		if err != nil {
 			log.Fatal(err)
@@ -105,6 +104,7 @@ var addCmd = &cobra.Command{
 		}
 		defer blob.Close()
 
+		// write .go-git/index
 		index, err := os.Create(INDEX_PATH)
 		if err != nil {
 			log.Fatal(err)
@@ -113,20 +113,6 @@ var addCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 		defer index.Close()
-
-		// zr, err := zlib.NewReader(deflated)
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
-		// io.Copy(os.Stdout, zr)
-
-		// var b bytes.Buffer
-		// w := zlib.NewWriter(&b)
-		// w.Write([]byte("hello, world\n"))
-		// w.Close()
-		// r, err := zlib.NewReader(&b)
-		// io.Copy(os.Stdout, r)
-		// r.Close()
 
 	},
 }

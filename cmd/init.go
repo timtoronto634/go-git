@@ -47,6 +47,9 @@ to quickly create a Cobra application.`,
 			if fname == ".go-git/HEAD" {
 				f.Write([]byte("ref: refs/heads/master"))
 			}
+			if err := f.Close(); err != nil {
+				log.Fatal(err)
+			}
 		}
 	},
 }

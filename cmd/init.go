@@ -1,11 +1,12 @@
 /*
 Copyright © 2023 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -22,6 +23,31 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("init called")
+		var directories [3]string = [3]string{
+			".go-git/",
+			".go-git/objects/",
+			".go-git/refs/",
+		}
+		var files [6]string = [6]string{
+			".go-git/HEAD",
+			".go-git/config",
+			".go-git/objects/info",
+			".go-git/objects/pack",
+			".go-git/refs/heads",
+			".go-git/refs/tags",
+		}
+		for _, d := range directories {
+			os.Mkdir(d, os.ModePerm)
+		}
+		for _, fname := range files {
+			f, err := os.Create(fname)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if fname == ".go-git/HEAD" {
+				f.Write([]byte("ref: refs/heads/master"))
+			}
+		}
 	},
 }
 
